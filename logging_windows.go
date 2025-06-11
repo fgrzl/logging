@@ -124,16 +124,19 @@ func (h *WindowsCustomHandler) Enabled(ctx context.Context, level slog.Level) bo
 }
 
 func (h *WindowsCustomHandler) Handle(ctx context.Context, record slog.Record) error {
+
 	if isTerminalOutput(h.writer) {
-		_, err := fmt.Fprint(h.writer,
-			"\x1b["+colorCode(record.Level)+"m", // Start color
-			fmt.Sprintf("[%s]", levelText(record.Level)),
-			" ",
-			record.Message,
-			"\n",
-			"\x1b[0m", // Reset color
-		)
-		return err
+		// Start with level and message
+		fmt.Fprintf(h.writer, "\x1b[%sm[%s] %s", colorCode(record.Level), levelText(record.Level), record.Message)
+
+		// Append structured attributes
+		record.Attrs(func(a slog.Attr) bool {
+			fmt.Fprintf(h.writer, " %s : %v", a.Key, a.Value.Any())
+			return true
+		})
+
+		fmt.Fprint(h.writer, "\x1b[0m\n") // Reset color and newline
+		return nil
 	}
 
 	if h.handler != nil {

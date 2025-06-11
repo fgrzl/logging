@@ -77,20 +77,25 @@ func (h *CustomHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *CustomHandler) Handle(ctx context.Context, record slog.Record) error {
-	levelStr := getLevelString(record.Level, isTerminalOutput(h.writer))
-	plainLevelStr := getLevelString(record.Level, false)
-
-	// Clone record and add plain level string as an attribute
-	newRecord := record.Clone()
-	newRecord.AddAttrs(slog.String("level_str", plainLevelStr))
-
-	// For terminal output, print colored log directly
 	if isTerminalOutput(h.writer) {
-		_, err := fmt.Fprintf(h.writer, "%s %s\n", levelStr, record.Message)
-		return err
+		levelStr := getLevelString(record.Level, true)
+
+		// Write level and message
+		fmt.Fprintf(h.writer, "%s %s", levelStr, record.Message)
+
+		// Print all structured attributes
+		record.Attrs(func(a slog.Attr) bool {
+			fmt.Fprintf(h.writer, " %s=%v", a.Key, a.Value.Any())
+			return true
+		})
+
+		fmt.Fprint(h.writer, "\n")
+		return nil
 	}
 
-	// For non-terminal output, delegate to the wrapped handler
+	// Clone and add plain level string to the record
+	newRecord := record.Clone()
+	newRecord.AddAttrs(slog.String("level_str", getLevelString(record.Level, false)))
 	return h.handler.Handle(ctx, newRecord)
 }
 
